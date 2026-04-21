@@ -21,9 +21,10 @@ namespace Snitch.Analysis
             string path,
             string? tfm,
             string[]? skip,
-            IEnumerable<Project>? cache = null)
+            IEnumerable<Project>? cache = null,
+            AnalyzerManager? manager = null)
         {
-            var manager = new AnalyzerManager();
+            manager ??= new AnalyzerManager();
             var built = cache?.ToDictionary(x => x.File, x => x, StringComparer.OrdinalIgnoreCase)
                 ?? new Dictionary<string, Project>(StringComparer.OrdinalIgnoreCase);
 

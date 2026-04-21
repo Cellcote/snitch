@@ -65,6 +65,11 @@ namespace Snitch.Commands
                 return settings.Skip?.Contains(projectName, StringComparer.OrdinalIgnoreCase) ?? false;
             });
 
+            // Sort projects topologically (leaves first) to maximize build cache hits.
+            // This ensures that when a project is built, all its dependencies are already
+            // cached, avoiding redundant MSBuild design-time builds.
+            projectsToAnalyze = DependencyGraph.TopologicalSort(projectsToAnalyze);
+
             var targetFramework = settings.TargetFramework;
             var analyzerResults = new List<ProjectAnalyzerResult>();
             var projectCache = new HashSet<Project>(new ProjectComparer());
@@ -77,6 +82,10 @@ namespace Snitch.Commands
 
                 _console.MarkupLine($"Analyzing [yellow]{Path.GetFileName(entry)}[/]");
 
+                // Reuse a single AnalyzerManager across all project builds to avoid
+                // reinitializing MSBuild infrastructure for each project.
+                var manager = new Buildalyzer.AnalyzerManager();
+
                 foreach (var projectToAnalyze in projectsToAnalyze)
                 {
                     // Perform a design time build of the project.
@@ -84,7 +93,8 @@ namespace Snitch.Commands
                         projectToAnalyze,
                         targetFramework,
                         settings.Skip,
-                        projectCache);
+                        projectCache,
+                        manager);
 
                     // Update the cache of built projects.
                     projectCache.Add(buildResult.Project);
