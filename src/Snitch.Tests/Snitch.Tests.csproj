@@ -25,9 +25,9 @@
 
   <!-- Transitive vulnerability overrides (NU1902/NU1903/NU1904) -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.11.4" />
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
-    <PackageReference Include="System.Security.Cryptography.Xml" Version="8.0.2" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.16" />
   </ItemGroup>
 
   <ItemGroup>
