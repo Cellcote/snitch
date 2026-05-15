@@ -254,5 +254,53 @@ namespace Sntich.Tests
             exitCode.ShouldBe(0);
             await Verifier.Verify(output);
         }
+
+        [Fact]
+        [Expectation("Solution", "Internal_Autofac")]
+        public async Task Should_Group_Results_By_Internal_When_Internal_Prefix_Specified()
+        {
+            // Given
+            var fixture = new Fixture();
+            var solution = Fixture.GetPath("Snitch.Tests.Fixtures.sln");
+
+            // When
+            var (exitCode, output) = await Fixture.Run(solution, "--internal", "Autofac");
+
+            // Then
+            exitCode.ShouldBe(0);
+            await Verifier.Verify(output);
+        }
+
+        [Fact]
+        [Expectation("Solution", "Internal_Wildcard")]
+        public async Task Should_Match_Internal_Packages_Using_Wildcard_Pattern()
+        {
+            // Given
+            var fixture = new Fixture();
+            var solution = Fixture.GetPath("Snitch.Tests.Fixtures.sln");
+
+            // When
+            var (exitCode, output) = await Fixture.Run(solution, "--internal", "Newt*");
+
+            // Then
+            exitCode.ShouldBe(0);
+            await Verifier.Verify(output);
+        }
+
+        [Fact]
+        [Expectation("Baz", "Internal_NoMatch")]
+        public async Task Should_Keep_Behavior_When_Internal_Pattern_Does_Not_Match()
+        {
+            // Given
+            var fixture = new Fixture();
+            var project = Fixture.GetPath("Baz/Baz.csproj");
+
+            // When
+            var (exitCode, output) = await Fixture.Run(project, "--internal", "Acme.*");
+
+            // Then
+            exitCode.ShouldBe(0);
+            await Verifier.Verify(output);
+        }
     }
 }
