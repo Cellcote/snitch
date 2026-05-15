@@ -51,6 +51,10 @@ namespace Snitch.Commands
             [CommandOption("--vulnerable")]
             [Description("Cross-references packages with the OSV.dev vulnerability database and tags rows with severity.")]
             public bool CheckVulnerabilities { get; set; }
+
+            [CommandOption("--internal <PATTERN>")]
+            [Description("One or more prefixes/patterns that classify a package as internal (e.g. Acme or Acme.*). When set, results are grouped into internal (fixable at source) and external (must wait or override).")]
+            public string[]? Internal { get; set; }
         }
 
         public AnalyzeCommand(IAnsiConsole console)
@@ -131,7 +135,8 @@ namespace Snitch.Commands
             }
 
             // Write the report to the console.
-            _reporter.WriteToConsole(analyzerResults, settings.NoPreRelease, vulnerabilityReport);
+            var classifier = new PackageClassifier(settings.Internal);
+            _reporter.WriteToConsole(analyzerResults, settings.NoPreRelease, vulnerabilityReport, classifier);
 
             // Return the correct exit code.
             return GetExitCode(settings, analyzerResults, vulnerabilityReport);

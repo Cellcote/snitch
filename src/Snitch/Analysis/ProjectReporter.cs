@@ -18,7 +18,7 @@ namespace Snitch.Analysis
 
         public void WriteToConsole([NotNull] List<ProjectAnalyzerResult> results, bool noPreRelease)
         {
-            WriteToConsole(results, noPreRelease, VulnerabilityReport.Empty);
+            WriteToConsole(results, noPreRelease, VulnerabilityReport.Empty, new PackageClassifier(null));
         }
 
         public void WriteToConsole(
@@ -26,16 +26,21 @@ namespace Snitch.Analysis
             bool noPreRelease,
             [NotNull] VulnerabilityReport vulnerabilityReport)
         {
-            var resultsWithPackageToRemove = results.Where(r => r.CanBeRemoved.Count > 0).ToList();
-            var resultsWithPackageMayBeRemove = results.Where(r => r.MightBeRemoved.Count > 0).ToList();
-            var resultsWithPreReleases = results.Where(r => r.PreReleasePackages.Count > 0).ToList();
+            WriteToConsole(results, noPreRelease, vulnerabilityReport, new PackageClassifier(null));
+        }
+
+        public void WriteToConsole(
+            [NotNull] List<ProjectAnalyzerResult> results,
+            bool noPreRelease,
+            [NotNull] VulnerabilityReport vulnerabilityReport,
+            [NotNull] PackageClassifier classifier)
+        {
             var showVulns = !vulnerabilityReport.IsEmpty;
 
             if (results.All(x => x.NoPackagesToRemove)
-                && (!noPreRelease || resultsWithPreReleases.Count == 0)
+                && (!noPreRelease || results.All(r => !r.HasPreReleases))
                 && !showVulns)
             {
-                // Output the result.
                 _console.WriteLine();
                 _console.MarkupLine("[green]Everything looks good![/]");
                 _console.WriteLine();
@@ -45,141 +50,33 @@ namespace Snitch.Analysis
             var report = new Grid();
             report.AddColumn();
 
-            if (resultsWithPackageToRemove.Count > 0)
+            if (classifier.IsConfigured)
             {
-                foreach (var (_, _, last, result) in resultsWithPackageToRemove.Enumerate())
+                var hasInternal = HasAnythingToReport(results, p => classifier.IsInternal(p), noPreRelease);
+                var hasExternal = HasAnythingToReport(results, p => !classifier.IsInternal(p), noPreRelease);
+
+                if (hasInternal)
                 {
-                    var table = new Table().BorderColor(Color.Grey).Expand();
-                    if (showVulns)
-                    {
-                        table.AddColumns("[grey]Package[/]", "[grey]Referenced by[/]", "[grey]Severity[/]");
-                    }
-                    else
-                    {
-                        table.AddColumns("[grey]Package[/]", "[grey]Referenced by[/]");
-                    }
+                    report.AddRow(" [yellow u]Internal[/] [grey]— fixable at source (open a PR upstream)[/]");
+                    report.AddEmptyRow();
+                    AddResultsToReport(report, results, p => classifier.IsInternal(p), noPreRelease, vulnerabilityReport);
+                }
 
-                    foreach (var item in result.CanBeRemoved)
-                    {
-                        var packageName = $"[green]{item.Package.Name}[/]";
-                        var referencedBy = $"[aqua]{item.Original.Project.Name}[/]";
-                        if (showVulns)
-                        {
-                            var severity = HighestSeverityFor(vulnerabilityReport, item.Package, item.Original.Package);
-                            table.AddRow(packageName, referencedBy, FormatSeverity(severity));
-                        }
-                        else
-                        {
-                            table.AddRow(packageName, referencedBy);
-                        }
-                    }
+                if (hasInternal && hasExternal)
+                {
+                    report.AddEmptyRow();
+                }
 
-                    var cpmSuffix = result.IsCpmEnabled ? " [grey](CPM)[/]" : string.Empty;
-                    report.AddRow($" [yellow]Packages that can be removed from[/] [aqua]{result.Project}[/]{cpmSuffix}:");
-                    report.AddRow(table);
-
-                    if (result.IsCpmEnabled)
-                    {
-                        report.AddRow($"   [grey]Remove the [/][silver]<PackageReference>[/][grey] entry from[/] [aqua]{result.Project}[/][grey]; versions remain in[/] [silver]Directory.Packages.props[/][grey].[/]");
-                    }
-
-                    if (!last || (last && resultsWithPackageMayBeRemove.Count > 0))
-                    {
-                        report.AddEmptyRow();
-                    }
+                if (hasExternal)
+                {
+                    report.AddRow(" [yellow u]External[/] [grey]— must wait or override[/]");
+                    report.AddEmptyRow();
+                    AddResultsToReport(report, results, p => !classifier.IsInternal(p), noPreRelease, vulnerabilityReport);
                 }
             }
-
-            if (resultsWithPackageMayBeRemove.Count > 0)
+            else
             {
-                foreach (var (_, _, last, result) in resultsWithPackageMayBeRemove.Enumerate())
-                {
-                    var table = new Table().BorderColor(Color.Grey).Expand();
-                    if (showVulns)
-                    {
-                        table.AddColumns("[grey]Package[/]", "[grey]Version[/]", "[grey]Reason[/]", "[grey]Severity[/]");
-                    }
-                    else
-                    {
-                        table.AddColumns("[grey]Package[/]", "[grey]Version[/]", "[grey]Reason[/]");
-                    }
-
-                    foreach (var item in result.MightBeRemoved)
-                    {
-                        string reason;
-                        if (item.Package.IsGreaterThan(item.Original.Package, out var indeterminate))
-                        {
-                            var name = item.Original.Project.Name;
-                            var version = item.Original.Package.GetVersionString();
-                            var verb = indeterminate ? "Might be updated from" : "Updated from";
-                            reason = $"[grey]{verb}[/] [silver]{version}[/] [grey]in[/] [aqua]{name}[/]";
-                        }
-                        else
-                        {
-                            var name = item.Original.Project.Name;
-                            var version = item.Original.Package.GetVersionString();
-                            var verb = indeterminate ? "Does not match" : "Downgraded from";
-                            reason = $"[grey]{verb}[/] [silver]{version}[/] [grey]in[/] [aqua]{name}[/]";
-                        }
-
-                        if (showVulns)
-                        {
-                            var severity = HighestSeverityFor(vulnerabilityReport, item.Package, item.Original.Package);
-                            table.AddRow(
-                                $"[green]{item.Package.Name}[/]",
-                                item.Package.GetVersionString(),
-                                reason,
-                                FormatSeverity(severity));
-                        }
-                        else
-                        {
-                            table.AddRow(
-                                $"[green]{item.Package.Name}[/]",
-                                item.Package.GetVersionString(),
-                                reason);
-                        }
-                    }
-
-                    var cpmSuffix = result.IsCpmEnabled ? " [grey](CPM)[/]" : string.Empty;
-                    report.AddRow($" [yellow]Packages that [u]might[/] be removed from[/] [aqua]{result.Project}[/]{cpmSuffix}:");
-                    report.AddRow(table);
-
-                    if (result.IsCpmEnabled)
-                    {
-                        report.AddRow($"   [grey]Adjust versions in[/] [silver]Directory.Packages.props[/][grey] (not the csproj).[/]");
-                    }
-
-                    if (!last)
-                    {
-                        report.AddEmptyRow();
-                    }
-                }
-            }
-
-            if (noPreRelease && resultsWithPreReleases.Count > 0)
-            {
-                report.AddEmptyRow();
-                report.AddRow($" [yellow]Projects with pre-release package references:[/]");
-                var packagesByProject = resultsWithPreReleases.SelectMany(x => x.PreReleasePackages, (project, package) => new
-                {
-                    Project = project.Project,
-                    PackageName = package.Name,
-                    Version = package.Version,
-                })
-                                                              .OrderBy(o => o.Project)
-                                                              .ToList();
-
-                var table = new Table().BorderColor(Color.Grey).Expand();
-                table.AddColumns("[grey]Project[/]", "[grey]Package[/]", "[grey]Version[/]");
-                foreach (var item in packagesByProject)
-                {
-                    table.AddRow(
-                        $"[green]{item.Project}[/]",
-                        $"[yellow]{item.PackageName}[/]",
-                        $"{item.Version}");
-                }
-
-                report.AddRow(table);
+                AddResultsToReport(report, results, _ => true, noPreRelease, vulnerabilityReport);
             }
 
             if (showVulns)
@@ -221,6 +118,200 @@ namespace Snitch.Analysis
                     .BorderColor(Color.Grey));
         }
 
+        private static bool HasAnythingToReport(
+            List<ProjectAnalyzerResult> results,
+            Func<Package, bool> predicate,
+            bool noPreRelease)
+        {
+            foreach (var result in results)
+            {
+                if (result.CanBeRemoved.Any(p => predicate(p.Package)))
+                {
+                    return true;
+                }
+
+                if (result.MightBeRemoved.Any(p => predicate(p.Package)))
+                {
+                    return true;
+                }
+            }
+
+            if (noPreRelease)
+            {
+                foreach (var result in results)
+                {
+                    if (result.PreReleasePackages.Any(predicate))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static void AddResultsToReport(
+            Grid report,
+            List<ProjectAnalyzerResult> results,
+            Func<Package, bool> predicate,
+            bool noPreRelease,
+            VulnerabilityReport vulnerabilityReport)
+        {
+            var showVulns = !vulnerabilityReport.IsEmpty;
+
+            var resultsWithPackageToRemove = results
+                .Select(r => new FilteredResult<PackageToRemove>(r, r.CanBeRemoved.Where(p => predicate(p.Package)).ToList()))
+                .Where(x => x.Items.Count > 0)
+                .ToList();
+
+            var resultsWithPackageMayBeRemove = results
+                .Select(r => new FilteredResult<PackageToRemove>(r, r.MightBeRemoved.Where(p => predicate(p.Package)).ToList()))
+                .Where(x => x.Items.Count > 0)
+                .ToList();
+
+            var resultsWithPreReleases = results
+                .Select(r => new FilteredResult<Package>(r, r.PreReleasePackages.Where(predicate).ToList()))
+                .Where(x => x.Items.Count > 0)
+                .ToList();
+
+            if (resultsWithPackageToRemove.Count > 0)
+            {
+                foreach (var (_, _, last, item) in resultsWithPackageToRemove.Enumerate())
+                {
+                    var table = new Table().BorderColor(Color.Grey).Expand();
+                    if (showVulns)
+                    {
+                        table.AddColumns("[grey]Package[/]", "[grey]Referenced by[/]", "[grey]Severity[/]");
+                    }
+                    else
+                    {
+                        table.AddColumns("[grey]Package[/]", "[grey]Referenced by[/]");
+                    }
+
+                    foreach (var pkg in item.Items)
+                    {
+                        var packageName = $"[green]{pkg.Package.Name}[/]";
+                        var referencedBy = $"[aqua]{pkg.Original.Project.Name}[/]";
+                        if (showVulns)
+                        {
+                            var severity = HighestSeverityFor(vulnerabilityReport, pkg.Package, pkg.Original.Package);
+                            table.AddRow(packageName, referencedBy, FormatSeverity(severity));
+                        }
+                        else
+                        {
+                            table.AddRow(packageName, referencedBy);
+                        }
+                    }
+
+                    var cpmSuffix = item.Result.IsCpmEnabled ? " [grey](CPM)[/]" : string.Empty;
+                    report.AddRow($" [yellow]Packages that can be removed from[/] [aqua]{item.Result.Project}[/]{cpmSuffix}:");
+                    report.AddRow(table);
+
+                    if (item.Result.IsCpmEnabled)
+                    {
+                        report.AddRow($"   [grey]Remove the [/][silver]<PackageReference>[/][grey] entry from[/] [aqua]{item.Result.Project}[/][grey]; versions remain in[/] [silver]Directory.Packages.props[/][grey].[/]");
+                    }
+
+                    if (!last || (last && resultsWithPackageMayBeRemove.Count > 0))
+                    {
+                        report.AddEmptyRow();
+                    }
+                }
+            }
+
+            if (resultsWithPackageMayBeRemove.Count > 0)
+            {
+                foreach (var (_, _, last, item) in resultsWithPackageMayBeRemove.Enumerate())
+                {
+                    var table = new Table().BorderColor(Color.Grey).Expand();
+                    if (showVulns)
+                    {
+                        table.AddColumns("[grey]Package[/]", "[grey]Version[/]", "[grey]Reason[/]", "[grey]Severity[/]");
+                    }
+                    else
+                    {
+                        table.AddColumns("[grey]Package[/]", "[grey]Version[/]", "[grey]Reason[/]");
+                    }
+
+                    foreach (var pkg in item.Items)
+                    {
+                        string reason;
+                        if (pkg.Package.IsGreaterThan(pkg.Original.Package, out var indeterminate))
+                        {
+                            var name = pkg.Original.Project.Name;
+                            var version = pkg.Original.Package.GetVersionString();
+                            var verb = indeterminate ? "Might be updated from" : "Updated from";
+                            reason = $"[grey]{verb}[/] [silver]{version}[/] [grey]in[/] [aqua]{name}[/]";
+                        }
+                        else
+                        {
+                            var name = pkg.Original.Project.Name;
+                            var version = pkg.Original.Package.GetVersionString();
+                            var verb = indeterminate ? "Does not match" : "Downgraded from";
+                            reason = $"[grey]{verb}[/] [silver]{version}[/] [grey]in[/] [aqua]{name}[/]";
+                        }
+
+                        if (showVulns)
+                        {
+                            var severity = HighestSeverityFor(vulnerabilityReport, pkg.Package, pkg.Original.Package);
+                            table.AddRow(
+                                $"[green]{pkg.Package.Name}[/]",
+                                pkg.Package.GetVersionString(),
+                                reason,
+                                FormatSeverity(severity));
+                        }
+                        else
+                        {
+                            table.AddRow(
+                                $"[green]{pkg.Package.Name}[/]",
+                                pkg.Package.GetVersionString(),
+                                reason);
+                        }
+                    }
+
+                    var cpmSuffix = item.Result.IsCpmEnabled ? " [grey](CPM)[/]" : string.Empty;
+                    report.AddRow($" [yellow]Packages that [u]might[/] be removed from[/] [aqua]{item.Result.Project}[/]{cpmSuffix}:");
+                    report.AddRow(table);
+
+                    if (item.Result.IsCpmEnabled)
+                    {
+                        report.AddRow($"   [grey]Adjust versions in[/] [silver]Directory.Packages.props[/][grey] (not the csproj).[/]");
+                    }
+
+                    if (!last)
+                    {
+                        report.AddEmptyRow();
+                    }
+                }
+            }
+
+            if (noPreRelease && resultsWithPreReleases.Count > 0)
+            {
+                report.AddEmptyRow();
+                report.AddRow(" [yellow]Projects with pre-release package references:[/]");
+                var packagesByProject = resultsWithPreReleases.SelectMany(x => x.Items, (filtered, package) => new
+                {
+                    Project = filtered.Result.Project,
+                    PackageName = package.Name,
+                    Version = package.Version,
+                })
+                .OrderBy(o => o.Project)
+                .ToList();
+
+                var table = new Table().BorderColor(Color.Grey).Expand();
+                table.AddColumns("[grey]Project[/]", "[grey]Package[/]", "[grey]Version[/]");
+                foreach (var item in packagesByProject)
+                {
+                    table.AddRow(
+                        $"[green]{item.Project}[/]",
+                        $"[yellow]{item.PackageName}[/]",
+                        $"{item.Version}");
+                }
+
+                report.AddRow(table);
+            }
+        }
+
         private static VulnerabilitySeverity HighestSeverityFor(
             VulnerabilityReport report,
             Package primary,
@@ -256,6 +347,18 @@ namespace Snitch.Analysis
                 VulnerabilitySeverity.Low => "[silver]LOW[/]",
                 _ => "[grey]-[/]",
             };
+        }
+
+        private sealed class FilteredResult<T>
+        {
+            public ProjectAnalyzerResult Result { get; }
+            public List<T> Items { get; }
+
+            public FilteredResult(ProjectAnalyzerResult result, List<T> items)
+            {
+                Result = result;
+                Items = items;
+            }
         }
     }
 }

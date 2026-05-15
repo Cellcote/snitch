@@ -128,6 +128,19 @@ hit. Combine with `--strict` to fail CI when any vulnerable package is found._
 > snitch MyProject.csproj --vulnerable
 ```
 
+_Group results by internal vs external packages so you can triage who-fixes-what
+during e.g. a CVE sweep. Internal packages are those you control and can fix at
+source (open a PR upstream); everything else is external (must wait for an upstream
+release or be overridden). Patterns are matched case-insensitively. A pattern
+without wildcards is treated as a prefix matching either an exact name or names
+with a "." separator after the prefix (so `Acme` matches `Acme` and
+`Acme.Foo`); patterns with `*` / `?` are treated as glob patterns matched against
+the full package name._
+
+```
+> snitch MyProject.csproj --internal Acme --internal MyCompany.*
+```
+
 ## Building Snitch from source
 
 ```
