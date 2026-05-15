@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Buildalyzer;
@@ -25,9 +26,11 @@ namespace Snitch.Analysis
 
             var mappings = new Dictionary<NuGetFramework, string>(
                 candidates.ToDictionary(
-                    x => NuGetFramework.Parse(x, provider), y => y, new NuGetFrameworkFullComparer()));
+                    x => NuGetFramework.Parse(x, provider), y => y, NuGetFrameworkFullComparer.Instance));
 
-            return mappings[reducer.GetNearest(framework, mappings.Keys)];
+            var nearest = reducer.GetNearest(framework, mappings.Keys)
+                ?? throw new InvalidOperationException($"No compatible framework found for '{framework}'.");
+            return mappings[nearest];
         }
     }
 }
