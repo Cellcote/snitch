@@ -3,13 +3,13 @@ Analyzing Snitch.Tests.Fixtures.slnx
 Analyzing Foo...
 Analyzing Bar...
 Analyzing Baz...
-Analyzing Qux...
-Analyzing Zap...
+Analyzing FSharp...
 Analyzing Quux...
 Analyzing Quuux...
+Analyzing Qux...
 Analyzing Thud...
 Analyzing Thuuud...
-Analyzing FSharp...
+Analyzing Zap...
 
 ╭─────────────────────────────────────────────────────────────────╮
 │  Packages that can be removed from Bar:                         │
@@ -26,12 +26,26 @@ Analyzing FSharp...
 │ │ Autofac              │ Foo                                  │ │
 │ └──────────────────────┴──────────────────────────────────────┘ │
 │                                                                 │
+│  Packages that can be removed from FSharp:                      │
+│ ┌──────────────────────┬──────────────────────────────────────┐ │
+│ │ Package              │ Referenced by                        │ │
+│ ├──────────────────────┼──────────────────────────────────────┤ │
+│ │ Autofac              │ Foo                                  │ │
+│ └──────────────────────┴──────────────────────────────────────┘ │
+│                                                                 │
 │  Packages that might be removed from Qux:                       │
 │ ┌───────────┬───────────┬─────────────────────────────────────┐ │
 │ │ Package   │ Version   │ Reason                              │ │
 │ ├───────────┼───────────┼─────────────────────────────────────┤ │
 │ │ Autofac   │ 4.9.3     │ Downgraded from 4.9.4 in Foo        │ │
 │ └───────────┴───────────┴─────────────────────────────────────┘ │
+│                                                                 │
+│  Packages that might be removed from Thuuud:                    │
+│ ┌─────────────────┬──────────────┬────────────────────────────┐ │
+│ │ Package         │ Version      │ Reason                     │ │
+│ ├─────────────────┼──────────────┼────────────────────────────┤ │
+│ │ Newtonsoft.Json │ 13.0.2-beta2 │ Updated from 12.0.1 in Foo │ │
+│ └─────────────────┴──────────────┴────────────────────────────┘ │
 │                                                                 │
 │  Packages that might be removed from Zap:                       │
 │ ┌──────────────────┬──────────┬───────────────────────────────┐ │
@@ -40,11 +54,4 @@ Analyzing FSharp...
 │ │ Newtonsoft.Json  │ 12.0.3   │ Updated from 12.0.1 in Foo    │ │
 │ │ Autofac          │ 4.9.3    │ Downgraded from 4.9.4 in Foo  │ │
 │ └──────────────────┴──────────┴───────────────────────────────┘ │
-│                                                                 │
-│  Packages that might be removed from Thuuud:                    │
-│ ┌─────────────────┬──────────────┬────────────────────────────┐ │
-│ │ Package         │ Version      │ Reason                     │ │
-│ ├─────────────────┼──────────────┼────────────────────────────┤ │
-│ │ Newtonsoft.Json │ 13.0.2-beta2 │ Updated from 12.0.1 in Foo │ │
-│ └─────────────────┴──────────────┴────────────────────────────┘ │
 ╰─────────────────────────────────────────────────────────────────╯
