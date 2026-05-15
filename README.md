@@ -141,6 +141,30 @@ the full package name._
 > snitch MyProject.csproj --internal Acme --internal MyCompany.*
 ```
 
+## Reverse dependency lookup
+
+The `why` command shows every dependency path from a direct reference down to a
+specific package, across the whole solution at once. It replaces having to run
+`dotnet nuget why` per project when chasing a vulnerable or unwanted transitive
+package.
+
+```
+> snitch why System.Text.Json
+```
+
+```
+> snitch why System.Text.Json MyProject.csproj
+```
+
+```
+> snitch why System.Text.Json MySolution.sln --tfm net8.0
+```
+
+Paths are displayed as a tree per project, merging shared prefixes. Project
+references in the chain are marked `(project)` so you can tell them apart from
+NuGet packages. Run `dotnet restore` first — the command reads each project's
+`project.assets.json`.
+
 ## Building Snitch from source
 
 ```
