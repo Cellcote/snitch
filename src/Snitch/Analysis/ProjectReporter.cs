@@ -161,11 +161,11 @@ namespace Snitch.Analysis
                 report.AddEmptyRow();
                 report.AddRow($" [yellow]Projects with pre-release package references:[/]");
                 var packagesByProject = resultsWithPreReleases.SelectMany(x => x.PreReleasePackages, (project, package) => new
-                                                              {
-                                                                  Project = project.Project,
-                                                                  PackageName = package.Name,
-                                                                  Version = package.Version,
-                                                              })
+                {
+                    Project = project.Project,
+                    PackageName = package.Name,
+                    Version = package.Version,
+                })
                                                               .OrderBy(o => o.Project)
                                                               .ToList();
 
