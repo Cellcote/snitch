@@ -118,6 +118,16 @@ _Examine a specific project or solution to make sure there are no pre-release pa
 > snitch MyProject.csproj --no-prerelease
 ```
 
+_Examine a specific project or solution and cross-reference every referenced
+package against the [OSV.dev](https://osv.dev) vulnerability database (which
+aggregates GHSA, NVD and CVE data). Severity is shown next to each removable
+package, plus a dedicated "Vulnerable packages" section listing every advisory
+hit. Combine with `--strict` to fail CI when any vulnerable package is found._
+
+```
+> snitch MyProject.csproj --vulnerable
+```
+
 ## Building Snitch from source
 
 ```

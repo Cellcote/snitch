@@ -4,15 +4,18 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using Snitch.Analysis;
 using Snitch.Analysis.Utilities;
+using Snitch.Analysis.Vulnerabilities;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
 namespace Snitch.Commands
 {
     [Description("Shows transitive package dependencies that can be removed")]
-    public sealed class AnalyzeCommand : Command<AnalyzeCommand.Settings>
+    public sealed class AnalyzeCommand : AsyncCommand<AnalyzeCommand.Settings>
     {
         private readonly IAnsiConsole _console;
         private readonly ProjectBuilder _builder;
@@ -44,6 +47,10 @@ namespace Snitch.Commands
             [CommandOption("--no-prerelease")]
             [Description("Verifies that all package references are not pre-releases.")]
             public bool NoPreRelease { get; set; }
+
+            [CommandOption("--vulnerable")]
+            [Description("Cross-references packages with the OSV.dev vulnerability database and tags rows with severity.")]
+            public bool CheckVulnerabilities { get; set; }
         }
 
         public AnalyzeCommand(IAnsiConsole console)
@@ -54,7 +61,7 @@ namespace Snitch.Commands
             _reporter = new ProjectReporter(console);
         }
 
-        public override int Execute([NotNull] CommandContext context, [NotNull] Settings settings)
+        public override async Task<int> ExecuteAsync([NotNull] CommandContext context, [NotNull] Settings settings)
         {
             var projectsToAnalyze = PathUtility.GetProjectPaths(settings.ProjectOrSolutionPath, out var entry);
 
@@ -76,7 +83,7 @@ namespace Snitch.Commands
 
             _console.WriteLine();
 
-            return _console.Status().Start($"Analyzing...", ctx =>
+            await _console.Status().StartAsync("Analyzing...", async ctx =>
             {
                 ctx.Refresh();
 
@@ -114,22 +121,132 @@ namespace Snitch.Commands
                     analyzerResults.Add(analyzeResult);
                 }
 
-                // Write the report to the console
-                _reporter.WriteToConsole(analyzerResults, settings.NoPreRelease);
+                await Task.CompletedTask.ConfigureAwait(false);
+            }).ConfigureAwait(false);
 
-                // Return the correct exit code.
-                return GetExitCode(settings, analyzerResults);
-            });
+            var vulnerabilityReport = VulnerabilityReport.Empty;
+            if (settings.CheckVulnerabilities)
+            {
+                vulnerabilityReport = await CheckVulnerabilitiesAsync(analyzerResults, projectCache).ConfigureAwait(false);
+            }
+
+            // Write the report to the console.
+            _reporter.WriteToConsole(analyzerResults, settings.NoPreRelease, vulnerabilityReport);
+
+            // Return the correct exit code.
+            return GetExitCode(settings, analyzerResults, vulnerabilityReport);
         }
 
-        private static int GetExitCode(Settings settings, List<ProjectAnalyzerResult> result)
+        private async Task<VulnerabilityReport> CheckVulnerabilitiesAsync(
+            List<ProjectAnalyzerResult> analyzerResults,
+            HashSet<Project> projectCache)
         {
-            if (settings.Strict && (result.Any(r => !r.NoPackagesToRemove) || (settings.NoPreRelease && result.Any(r => r.HasPreReleases))))
+            var packages = CollectUniquePackages(analyzerResults, projectCache);
+            if (packages.Count == 0)
             {
-                return -1;
+                return VulnerabilityReport.Empty;
+            }
+
+            return await _console.Status().StartAsync(
+                $"Checking {packages.Count} package(s) against the OSV.dev vulnerability database...",
+                async ctx =>
+                {
+                    ctx.Refresh();
+
+                    try
+                    {
+                        using var service = new OsvVulnerabilityService();
+                        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+                        return await service.CheckAsync(packages, cts.Token).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _console.MarkupLine($"[yellow]WARN:[/] Could not query OSV.dev for vulnerabilities: {Markup.Escape(ex.Message)}");
+                        return VulnerabilityReport.Empty;
+                    }
+                }).ConfigureAwait(false);
+        }
+
+        private static List<(string Name, string Version)> CollectUniquePackages(
+            List<ProjectAnalyzerResult> analyzerResults,
+            HashSet<Project> projectCache)
+        {
+            var seen = new HashSet<(string Name, string Version)>(
+                new PackageKeyComparer());
+
+            void Add(string? name, string? version)
+            {
+                if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(version))
+                {
+                    return;
+                }
+
+                seen.Add((name, version));
+            }
+
+            // Packages flagged by Snitch — the rows we'd display.
+            foreach (var result in analyzerResults)
+            {
+                foreach (var entry in result.CanBeRemoved.Concat(result.MightBeRemoved))
+                {
+                    Add(entry.Package.Name, entry.Package.Version?.ToString());
+                    Add(entry.Original.Package.Name, entry.Original.Package.Version?.ToString());
+                }
+            }
+
+            // All packages across every analyzed project so we can surface any vulnerability,
+            // not just ones tied to a removable row.
+            foreach (var project in projectCache)
+            {
+                foreach (var package in project.Packages)
+                {
+                    Add(package.Name, package.Version?.ToString());
+                }
+            }
+
+            return seen.ToList();
+        }
+
+        private static int GetExitCode(
+            Settings settings,
+            List<ProjectAnalyzerResult> result,
+            VulnerabilityReport vulnerabilityReport)
+        {
+            if (settings.Strict)
+            {
+                if (result.Any(r => !r.NoPackagesToRemove))
+                {
+                    return -1;
+                }
+
+                if (settings.NoPreRelease && result.Any(r => r.HasPreReleases))
+                {
+                    return -1;
+                }
+
+                if (settings.CheckVulnerabilities && !vulnerabilityReport.IsEmpty)
+                {
+                    return -1;
+                }
             }
 
             return 0;
+        }
+
+        private sealed class PackageKeyComparer : IEqualityComparer<(string Name, string Version)>
+        {
+            public bool Equals((string Name, string Version) x, (string Name, string Version) y)
+            {
+                return string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(x.Version, y.Version, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public int GetHashCode((string Name, string Version) obj)
+            {
+                var nameHash = obj.Name?.GetHashCode(StringComparison.OrdinalIgnoreCase) ?? 0;
+                var versionHash = obj.Version?.GetHashCode(StringComparison.OrdinalIgnoreCase) ?? 0;
+                return HashCode.Combine(nameHash, versionHash);
+            }
         }
     }
 }
