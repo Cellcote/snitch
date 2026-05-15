@@ -65,14 +65,19 @@ namespace Snitch.Analysis.Utilities
         {
             root ??= Environment.CurrentDirectory;
 
-            var slns = Directory.GetFiles(root, "*.sln");
-            var slnxs = Directory.GetFiles(root, "*.slnx");
-            var allSolutions = new List<string>(slns);
-            allSolutions.AddRange(slnxs);
+            // Sort to make discovery deterministic; Directory.GetFiles does not
+            // guarantee any particular order.
+            var slns = Directory.GetFiles(root, "*.sln")
+                                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase);
+            var slnxs = Directory.GetFiles(root, "*.slnx")
+                                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase);
+            var allSolutions = slns.Concat(slnxs).ToList();
 
             if (allSolutions.Count == 0)
             {
-                var subProjects = Directory.GetFiles(root, "*.csproj");
+                var subProjects = Directory.GetFiles(root, "*.csproj")
+                                           .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+                                           .ToArray();
                 if (subProjects.Length == 0)
                 {
                     throw new InvalidOperationException("No project or solution file found.");
