@@ -110,7 +110,9 @@ namespace Snitch.Analysis
             built.Add(Path.GetFileName(path), project);
 
             // Get the package references.
-            foreach (var packageReference in result.PackageReferences)
+            // Order by package name so the resulting package list is deterministic;
+            // IReadOnlyDictionary's enumeration order is not contractually guaranteed.
+            foreach (var packageReference in result.PackageReferences.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
             {
                 if (!packageReference.Value.TryGetValue("Version", out var version))
                 {
