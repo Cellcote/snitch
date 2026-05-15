@@ -296,7 +296,7 @@ namespace Sntich.Tests
             var project = Fixture.GetPath("Baz/Baz.csproj");
 
             // When
-            var (exitCode, output) = await Fixture.Run(project, "--internal", "UiPath.*");
+            var (exitCode, output) = await Fixture.Run(project, "--internal", "Acme.*");
 
             // Then
             exitCode.ShouldBe(0);

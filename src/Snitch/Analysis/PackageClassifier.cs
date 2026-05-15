@@ -55,8 +55,8 @@ namespace Snitch.Analysis
             if (!pattern.Contains('*') && !pattern.Contains('?'))
             {
                 // No wildcards: treat as a prefix. Matches the exact name or names
-                // with a "." separator after the prefix (e.g. "UiPath" matches "UiPath"
-                // and "UiPath.Foo" but not "UiPathFoo").
+                // with a "." separator after the prefix (e.g. "Acme" matches "Acme"
+                // and "Acme.Foo" but not "AcmeFoo").
                 return new Regex(
                     "^" + Regex.Escape(pattern) + "(\\..*)?$",
                     RegexOptions.IgnoreCase);
