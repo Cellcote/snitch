@@ -12,6 +12,8 @@ namespace Snitch.Analysis
         public string Name { get; }
         public string TargetFramework { get; set; }
         public string? LockFilePath { get; set; }
+        public bool IsCpmEnabled { get; set; }
+        public CentralPackageManagementInfo? Cpm { get; set; }
         public List<Project> ProjectReferences { get; }
         public List<Package> Packages { get; }
 

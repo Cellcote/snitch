@@ -56,6 +56,13 @@ namespace Snitch.Analysis
                 // by one of the projects referenced by the project?
                 foreach (var package in project.Packages)
                 {
+                    // GlobalPackageReference items live in Directory.Packages.props and are
+                    // injected into every project — they can't be removed from a csproj.
+                    if (package.IsGlobalPackageReference)
+                    {
+                        continue;
+                    }
+
                     var found = accumulated.FindProjectPackage(package);
                     if (found != null)
                     {
@@ -77,6 +84,11 @@ namespace Snitch.Analysis
             {
                 foreach (var item in project.Packages)
                 {
+                    if (item.IsGlobalPackageReference)
+                    {
+                        continue;
+                    }
+
                     if (!accumulated.ContainsPackage(item))
                     {
                         AddToAccumulated(item);

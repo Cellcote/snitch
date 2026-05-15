@@ -10,6 +10,8 @@ namespace Snitch.Analysis
         private readonly List<PackageToRemove> _packages;
 
         public string Project => _project.Name;
+        public bool IsCpmEnabled => _project.IsCpmEnabled;
+        public string? CentralPackagesFilePath => _project.Cpm?.CentralPackagesFilePath;
         public IReadOnlyList<PackageToRemove> CanBeRemoved { get; }
         public IReadOnlyList<PackageToRemove> MightBeRemoved { get; }
         public IReadOnlyList<Package> PreReleasePackages { get; }

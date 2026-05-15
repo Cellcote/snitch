@@ -46,8 +46,14 @@ namespace Snitch.Analysis
                             $"[aqua]{item.Original.Project.Name}[/]");
                     }
 
-                    report.AddRow($" [yellow]Packages that can be removed from[/] [aqua]{result.Project}[/]:");
+                    var cpmSuffix = result.IsCpmEnabled ? " [grey](CPM)[/]" : string.Empty;
+                    report.AddRow($" [yellow]Packages that can be removed from[/] [aqua]{result.Project}[/]{cpmSuffix}:");
                     report.AddRow(table);
+
+                    if (result.IsCpmEnabled)
+                    {
+                        report.AddRow($"   [grey]Remove the [/][silver]<PackageReference>[/][grey] entry from[/] [aqua]{result.Project}[/][grey]; versions remain in[/] [silver]Directory.Packages.props[/][grey].[/]");
+                    }
 
                     if (!last || (last && resultsWithPackageMayBeRemove.Count > 0))
                     {
@@ -91,8 +97,14 @@ namespace Snitch.Analysis
                         }
                     }
 
-                    report.AddRow($" [yellow]Packages that [u]might[/] be removed from[/] [aqua]{result.Project}[/]:");
+                    var cpmSuffix = result.IsCpmEnabled ? " [grey](CPM)[/]" : string.Empty;
+                    report.AddRow($" [yellow]Packages that [u]might[/] be removed from[/] [aqua]{result.Project}[/]{cpmSuffix}:");
                     report.AddRow(table);
+
+                    if (result.IsCpmEnabled)
+                    {
+                        report.AddRow($"   [grey]Adjust versions in[/] [silver]Directory.Packages.props[/][grey] (not the csproj).[/]");
+                    }
 
                     if (!last)
                     {

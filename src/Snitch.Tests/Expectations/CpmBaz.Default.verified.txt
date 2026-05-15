@@ -1,0 +1,15 @@
+﻿Analyzing...
+Analyzing CpmBaz.csproj
+Analyzing CpmBaz...
+  * Analyzing CpmFoo (netstandard2.0)...
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│  Packages that can be removed from CpmBaz (CPM):                             │
+│ ┌───────────────────────────┬──────────────────────────────────────────────┐ │
+│ │ Package                   │ Referenced by                                │ │
+│ ├───────────────────────────┼──────────────────────────────────────────────┤ │
+│ │ Autofac                   │ CpmFoo                                       │ │
+│ └───────────────────────────┴──────────────────────────────────────────────┘ │
+│    Remove the <PackageReference> entry from CpmBaz; versions remain in       │
+│ Directory.Packages.props.                                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
