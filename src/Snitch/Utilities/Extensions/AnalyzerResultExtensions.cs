@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Buildalyzer;
@@ -15,7 +16,10 @@ namespace Snitch.Analysis
         public static string GetNearestFrameworkMoniker(this IEnumerable<IAnalyzerResult> source, string framework)
         {
             var current = NuGetFramework.Parse(framework, DefaultFrameworkNameProvider.Instance);
-            return current.GetNearestFrameworkMoniker(source.Select(x => x.TargetFramework));
+            var candidates = source
+                .Select(x => x.TargetFramework)
+                .Where(tf => !string.IsNullOrWhiteSpace(tf));
+            return current.GetNearestFrameworkMoniker(candidates);
         }
 
         private static string GetNearestFrameworkMoniker(this NuGetFramework framework, IEnumerable<string> candidates)
@@ -25,9 +29,11 @@ namespace Snitch.Analysis
 
             var mappings = new Dictionary<NuGetFramework, string>(
                 candidates.ToDictionary(
-                    x => NuGetFramework.Parse(x, provider), y => y, new NuGetFrameworkFullComparer()));
+                    x => NuGetFramework.Parse(x, provider), y => y, NuGetFrameworkFullComparer.Instance));
 
-            return mappings[reducer.GetNearest(framework, mappings.Keys)];
+            var nearest = reducer.GetNearest(framework, mappings.Keys)
+                ?? throw new InvalidOperationException($"No compatible framework found for '{framework}'.");
+            return mappings[nearest];
         }
     }
 }

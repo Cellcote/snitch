@@ -23,6 +23,13 @@
     </PackageReference>
   </ItemGroup>
 
+  <!-- Transitive vulnerability overrides (NU1902/NU1903/NU1904) -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.16" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Snitch\Snitch.csproj" />
   </ItemGroup>

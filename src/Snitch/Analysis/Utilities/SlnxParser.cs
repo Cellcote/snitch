@@ -40,7 +40,9 @@ namespace Snitch.Analysis.Utilities
                     var pathAttr = child.Attribute("Path");
                     if (pathAttr != null && !string.IsNullOrWhiteSpace(pathAttr.Value))
                     {
-                        var projectPath = pathAttr.Value;
+                        // slnx Path attributes use Windows-style backslashes. Normalize
+                        // to the platform separator so paths resolve correctly on Linux.
+                        var projectPath = pathAttr.Value.Replace('\\', Path.DirectorySeparatorChar);
 
                         // Only include MSBuild project files (.csproj, .fsproj, .vbproj)
                         if (IsMSBuildProject(projectPath))

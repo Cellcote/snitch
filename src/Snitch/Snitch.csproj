@@ -24,10 +24,17 @@
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.1.0" />
     <PackageReference Include="Buildalyzer" Version="5.0.1" />
-    <PackageReference Include="NuGet.Frameworks" Version="6.0.0" />
-    <PackageReference Include="NuGet.ProjectModel" Version="6.0.0" />
-    <PackageReference Include="NuGet.Versioning" Version="6.0.0" />
+    <PackageReference Include="NuGet.Frameworks" Version="6.14.3" />
+    <PackageReference Include="NuGet.ProjectModel" Version="6.14.3" />
+    <PackageReference Include="NuGet.Versioning" Version="6.14.3" />
     <PackageReference Include="Spectre.Console.Cli" Version="0.47.0" />
+  </ItemGroup>
+
+  <!-- Transitive vulnerability overrides (NU1902/NU1903/NU1904) -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="17.14.28" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="9.0.16" />
   </ItemGroup>
 
   <!-- Static analysis -->
