@@ -32,7 +32,7 @@ namespace Snitch.Analysis
                     x => NuGetFramework.Parse(x, provider), y => y, NuGetFrameworkFullComparer.Instance));
 
             var nearest = reducer.GetNearest(framework, mappings.Keys)
-                ?? throw new InvalidOperationException($"No compatible framework found for '{framework}'.");
+                ?? throw new InvalidOperationException($"Could not determine a target framework compatible with '{framework}'.");
             return mappings[nearest];
         }
     }

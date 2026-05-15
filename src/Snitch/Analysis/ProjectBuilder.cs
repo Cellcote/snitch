@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Buildalyzer;
+using Buildalyzer.IO;
 using Snitch.Analysis.Utilities;
 using Spectre.Console;
 
@@ -189,7 +190,8 @@ namespace Snitch.Analysis
 
             _console.MarkupLine(status);
 
-            var projectAnalyzer = manager.GetProject(project.Path);
+            var projectAnalyzer = manager.GetProject(IOPath.Parse(project.Path))
+                ?? throw new InvalidOperationException($"Could not load project '{project.Path}'.");
             var results = (IEnumerable<IAnalyzerResult>)projectAnalyzer.Build();
 
             if (!string.IsNullOrWhiteSpace(tfm))
