@@ -1,2 +1,5 @@
 # fix commited files from crlf to lf
 729b1bd03e0fd3ef8cb99734a0a8bd5351f2f7a2
+
+# Normalize editorconfig to LF
+300fa4d1e99c8502d394fc2d9067f85dba3c0173
