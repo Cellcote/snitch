@@ -131,7 +131,9 @@ namespace Snitch.Analysis.Utilities
                     var include = element.Attribute("Include")?.Value;
                     if (include != null)
                     {
-                        var refFilename = Path.GetFileName(include);
+                        // csproj ProjectReference paths use Windows backslashes, which
+                        // `Path.GetFileName` doesn't split on Linux/macOS. Normalize first.
+                        var refFilename = Path.GetFileName(include.Replace('\\', Path.DirectorySeparatorChar));
                         if (knownProjects.ContainsKey(refFilename))
                         {
                             refs.Add(refFilename);
