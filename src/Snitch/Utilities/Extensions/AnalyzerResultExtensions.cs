@@ -16,7 +16,10 @@ namespace Snitch.Analysis
         public static string GetNearestFrameworkMoniker(this IEnumerable<IAnalyzerResult> source, string framework)
         {
             var current = NuGetFramework.Parse(framework, DefaultFrameworkNameProvider.Instance);
-            return current.GetNearestFrameworkMoniker(source.Select(x => x.TargetFramework));
+            var candidates = source
+                .Select(x => x.TargetFramework)
+                .Where(tf => !string.IsNullOrWhiteSpace(tf));
+            return current.GetNearestFrameworkMoniker(candidates);
         }
 
         private static string GetNearestFrameworkMoniker(this NuGetFramework framework, IEnumerable<string> candidates)
