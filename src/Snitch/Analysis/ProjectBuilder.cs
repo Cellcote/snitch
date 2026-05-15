@@ -96,18 +96,51 @@ namespace Snitch.Analysis
             project.TargetFramework = result.TargetFramework;
             project.LockFilePath = assetPath;
 
+            // Detect Central Package Management (CPM).
+            var managePackageVersionsCentrally = result.GetProperty("ManagePackageVersionsCentrally");
+            project.IsCpmEnabled = string.Equals(managePackageVersionsCentrally, "true", StringComparison.OrdinalIgnoreCase);
+            if (project.IsCpmEnabled)
+            {
+                var directoryPackagesPropsPath = result.GetProperty("DirectoryPackagesPropsPath");
+                project.Cpm = CentralPackageManagementReader.Read(directoryPackagesPropsPath, Path.GetDirectoryName(path) ?? string.Empty);
+            }
+
             // Add the project to the built list.
             built.Add(Path.GetFileName(path), project);
 
             // Get the package references.
             foreach (var packageReference in result.PackageReferences)
             {
-                if (packageReference.Value.TryGetValue("Version", out var version))
+                if (!packageReference.Value.TryGetValue("Version", out var version))
                 {
-                    var privateAssets = packageReference.Value.GetValueOrDefault("PrivateAssets");
-
-                    project.Packages.Add(new Package(packageReference.Key, version, privateAssets));
+                    version = null;
                 }
+
+                // Under CPM, GlobalPackageReference items may surface with an empty
+                // Version metadata — fall back to the central version.
+                if (string.IsNullOrWhiteSpace(version) && project.IsCpmEnabled && project.Cpm != null)
+                {
+                    project.Cpm.CentralPackageVersions.TryGetValue(packageReference.Key, out version);
+                }
+
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    continue;
+                }
+
+                var privateAssets = packageReference.Value.GetValueOrDefault("PrivateAssets");
+
+                var package = new Package(packageReference.Key, version, privateAssets);
+                if (project.IsCpmEnabled)
+                {
+                    package.IsCentrallyManaged = true;
+                    if (project.Cpm?.IsGlobalPackageReference(packageReference.Key) == true)
+                    {
+                        package.IsGlobalPackageReference = true;
+                    }
+                }
+
+                project.Packages.Add(package);
             }
 
             // Analyze all project references.

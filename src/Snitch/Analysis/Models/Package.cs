@@ -13,6 +13,10 @@ namespace Snitch.Analysis
 
         public string? PrivateAssets { get; }
 
+        public bool IsCentrallyManaged { get; set; }
+
+        public bool IsGlobalPackageReference { get; set; }
+
         public bool IsGreaterThan(Package package, out bool indeterminate)
         {
             indeterminate = true;

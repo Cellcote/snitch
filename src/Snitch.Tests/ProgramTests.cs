@@ -238,5 +238,21 @@ namespace Sntich.Tests
             exitCode.ShouldBe(0);
             await Verifier.Verify(output);
         }
+
+        [Fact]
+        [Expectation("CpmBaz", "Default")]
+        public async Task Should_Produce_Cpm_Aware_Output_For_CpmBaz()
+        {
+            // Given
+            var fixture = new Fixture();
+            var project = Fixture.GetPath("Cpm/CpmBaz/CpmBaz.csproj");
+
+            // When
+            var (exitCode, output) = await Fixture.Run(project);
+
+            // Then
+            exitCode.ShouldBe(0);
+            await Verifier.Verify(output);
+        }
     }
 }
