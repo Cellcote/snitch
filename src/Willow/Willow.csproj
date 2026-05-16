@@ -9,6 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>willow</ToolCommandName>
     <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <!-- NuGet package info -->
@@ -18,6 +19,9 @@
     <Authors>Patrik Svensson (original Snitch author), Willow contributors</Authors>
     <Copyright>Copyright (c) Willow contributors. Originally Snitch (c) 2019 Spectre Systems AB.</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Cellcote/willow</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Cellcote/willow</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <PackageTags>nuget;dependencies;transitive;packages;vulnerabilities;cve;dotnet-tool</PackageTags>
   </PropertyGroup>
 
@@ -44,7 +48,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="$(SolutionDir)..\src\icon.png" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildProjectDirectory)\..\icon.png" Pack="true" PackagePath="\" />
+    <None Include="$(MSBuildProjectDirectory)\..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>
