@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Policy;
 using NuGet.Frameworks;
 using NuGet.LibraryModel;
 using NuGet.ProjectModel;
@@ -10,6 +9,12 @@ namespace Snitch.Analysis
 {
     internal sealed class ProjectAnalyzer
     {
+        // Cache of "transitive packages exposed by this project" keyed by Project.
+        // Lives for the lifetime of the analyzer so it is shared across every
+        // root project in a solution sweep.
+        private readonly Dictionary<Project, Dictionary<string, ProjectPackage>> _accumulatedCache
+            = new Dictionary<Project, Dictionary<string, ProjectPackage>>(new ProjectComparer());
+
         public ProjectAnalyzerResult Analyze(Project project)
         {
             if (project == null)
@@ -17,9 +22,45 @@ namespace Snitch.Analysis
                 throw new ArgumentNullException(nameof(project));
             }
 
-            // Analyze the project.
             var result = new List<PackageToRemove>();
-            AnalyzeProject(project, project, result);
+
+            if (project.ProjectReferences.Count > 0)
+            {
+                // Merge the accumulated package sets exposed by each child reference.
+                // First reference wins on collisions (matches the original semantics).
+                var accumulated = new Dictionary<string, ProjectPackage>(StringComparer.OrdinalIgnoreCase);
+                foreach (var child in project.ProjectReferences)
+                {
+                    foreach (var kvp in GetAccumulated(child))
+                    {
+                        if (!accumulated.ContainsKey(kvp.Key))
+                        {
+                            accumulated[kvp.Key] = kvp.Value;
+                        }
+                    }
+                }
+
+                // Any package declared on the root that also comes in transitively
+                // is a candidate for removal.
+                var added = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var package in project.Packages)
+                {
+                    // GlobalPackageReference items live in Directory.Packages.props and are
+                    // injected into every project — they can't be removed from a csproj.
+                    if (package.IsGlobalPackageReference)
+                    {
+                        continue;
+                    }
+
+                    if (accumulated.TryGetValue(package.Name, out var found))
+                    {
+                        if (added.Add(package.Name))
+                        {
+                            result.Add(new PackageToRemove(project, package, found));
+                        }
+                    }
+                }
+            }
 
             if (project.LockFilePath != null)
             {
@@ -31,82 +72,48 @@ namespace Snitch.Analysis
             return new ProjectAnalyzerResult(project, result);
         }
 
-        private List<ProjectPackage> AnalyzeProject(Project root, Project project, List<PackageToRemove> result)
+        // Returns the set of packages this project "exposes" to its parents -
+        // every transitively-reachable package plus the project's own non-private
+        // package references. Memoized so each project in the DAG is walked once.
+        private Dictionary<string, ProjectPackage> GetAccumulated(Project project)
         {
-            var accumulated = new List<ProjectPackage>();
-            result ??= new List<PackageToRemove>();
-
-            if (project.ProjectReferences.Count > 0)
+            if (_accumulatedCache.TryGetValue(project, out var cached))
             {
-                // Iterate through all project references.
-                foreach (var child in project.ProjectReferences)
-                {
-                    // Analyze the project recursively.
-                    foreach (var item in AnalyzeProject(root, child, result))
-                    {
-                        // Didn't exist previously in the list of accumulated packages?
-                        if (!accumulated.ContainsPackage(item.Package))
-                        {
-                            accumulated.Add(new ProjectPackage(item.Project, item.Package));
-                        }
-                    }
-                }
-
-                // Was any package in the current project references
-                // by one of the projects referenced by the project?
-                foreach (var package in project.Packages)
-                {
-                    // GlobalPackageReference items live in Directory.Packages.props and are
-                    // injected into every project — they can't be removed from a csproj.
-                    if (package.IsGlobalPackageReference)
-                    {
-                        continue;
-                    }
-
-                    var found = accumulated.FindProjectPackage(package);
-                    if (found != null)
-                    {
-                        if (!result.ContainsPackage(found.Package))
-                        {
-                            if (project.Name.Equals(root.Name, StringComparison.OrdinalIgnoreCase))
-                            {
-                                result.Add(new PackageToRemove(project, package, found));
-                            }
-                        }
-                    }
-                    else
-                    {
-                        AddToAccumulated(package);
-                    }
-                }
+                return cached;
             }
-            else
-            {
-                foreach (var item in project.Packages)
-                {
-                    if (item.IsGlobalPackageReference)
-                    {
-                        continue;
-                    }
 
-                    if (!accumulated.ContainsPackage(item))
+            var accumulated = new Dictionary<string, ProjectPackage>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var child in project.ProjectReferences)
+            {
+                foreach (var kvp in GetAccumulated(child))
+                {
+                    if (!accumulated.ContainsKey(kvp.Key))
                     {
-                        AddToAccumulated(item);
+                        accumulated[kvp.Key] = kvp.Value;
                     }
                 }
             }
 
-            void AddToAccumulated(Package package)
+            foreach (var package in project.Packages)
             {
+                if (package.IsGlobalPackageReference)
+                {
+                    continue;
+                }
+
                 if (package.PrivateAssets != null && package.PrivateAssets.Contains("compile"))
                 {
-                    return;
+                    continue;
                 }
 
-                // Add the package to the list of accumulated packages.
-                accumulated.Add(new ProjectPackage(project, package));
+                if (!accumulated.ContainsKey(package.Name))
+                {
+                    accumulated[package.Name] = new ProjectPackage(project, package);
+                }
             }
 
+            _accumulatedCache[project] = accumulated;
             return accumulated;
         }
 
