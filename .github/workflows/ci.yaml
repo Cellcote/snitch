@@ -45,14 +45,14 @@ jobs:
 
       - name: Restore
         shell: bash
-        run: dotnet restore ./src/Snitch.sln
+        run: dotnet restore ./src/Bonsai.sln
 
       - name: Verify formatting
         shell: bash
-        run: dotnet format ./src/Snitch.sln --verify-no-changes --no-restore --severity error
+        run: dotnet format ./src/Bonsai.sln --verify-no-changes --no-restore --severity error
 
-  snitch:
-    name: Snitch self-check
+  bonsai:
+    name: Bonsai self-check
     if: "!contains(github.event.head_commit.message, 'skip-ci')"
     runs-on: ubuntu-latest
     steps:
@@ -62,6 +62,6 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
 
-      - name: Run Snitch on its own solution
+      - name: Run Bonsai on its own solution
         shell: bash
-        run: dotnet run --project ./src/Snitch/Snitch.csproj -c Release -- ./src/Snitch.sln --tfm net10.0 --strict
+        run: dotnet run --project ./src/Bonsai/Bonsai.csproj -c Release -- ./src/Bonsai.sln --tfm net10.0 --strict
