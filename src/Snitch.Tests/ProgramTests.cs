@@ -302,5 +302,101 @@ namespace Sntich.Tests
             exitCode.ShouldBe(0);
             await Verifier.Verify(output);
         }
+
+        [Fact]
+        public async Task Why_Should_Report_Direct_Package_Reference()
+        {
+            // Given
+            var project = Fixture.GetPath("Foo/Foo.csproj");
+
+            // When
+            var (exitCode, output) = await Fixture.Run("why", "Newtonsoft.Json", project);
+
+            // Then
+            exitCode.ShouldBe(0);
+            output.ShouldContain("Foo");
+            output.ShouldContain("Newtonsoft.Json");
+            output.ShouldContain("12.0.1");
+            output.ShouldContain("Found 1 path(s)");
+        }
+
+        [Fact]
+        public async Task Why_Should_Walk_Through_Project_References()
+        {
+            // Given
+            var project = Fixture.GetPath("Baz/Baz.csproj");
+
+            // When
+            var (exitCode, output) = await Fixture.Run("why", "Newtonsoft.Json", project);
+
+            // Then
+            exitCode.ShouldBe(0);
+            output.ShouldContain("Baz");
+            output.ShouldContain("Bar");
+            output.ShouldContain("Foo");
+            output.ShouldContain("(project)");
+            output.ShouldContain("Newtonsoft.Json");
+        }
+
+        [Fact]
+        public async Task Why_Should_Walk_Through_Transitive_Packages()
+        {
+            // Given
+            var project = Fixture.GetPath("Foo/Foo.csproj");
+
+            // When
+            var (exitCode, output) = await Fixture.Run("why", "Microsoft.NETCore.Platforms", project);
+
+            // Then
+            exitCode.ShouldBe(0);
+            output.ShouldContain("NETStandard.Library");
+            output.ShouldContain("Microsoft.NETCore.Platforms");
+        }
+
+        [Fact]
+        public async Task Why_Should_Report_When_No_Path_Found()
+        {
+            // Given
+            var project = Fixture.GetPath("Foo/Foo.csproj");
+
+            // When
+            var (exitCode, output) = await Fixture.Run("why", "System.Text.Json", project);
+
+            // Then
+            exitCode.ShouldBe(0);
+            output.ShouldContain("No dependency paths");
+            output.ShouldContain("System.Text.Json");
+        }
+
+        [Fact]
+        public async Task Why_Should_Match_Package_Name_Case_Insensitively()
+        {
+            // Given
+            var project = Fixture.GetPath("Foo/Foo.csproj");
+
+            // When
+            var (exitCode, output) = await Fixture.Run("why", "newtonsoft.json", project);
+
+            // Then
+            exitCode.ShouldBe(0);
+            output.ShouldContain("Newtonsoft.Json");
+            output.ShouldContain("12.0.1");
+        }
+
+        [Fact]
+        public async Task Why_Should_Scan_All_Projects_In_Solution()
+        {
+            // Given
+            var solution = Fixture.GetPath("Snitch.Tests.Fixtures.sln");
+
+            // When
+            var (exitCode, output) = await Fixture.Run("why", "Newtonsoft.Json", solution);
+
+            // Then
+            exitCode.ShouldBe(0);
+            output.ShouldContain("Foo");
+            output.ShouldContain("Zap");
+            output.ShouldContain("Thud");
+        }
     }
 }

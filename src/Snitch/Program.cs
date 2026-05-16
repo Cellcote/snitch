@@ -17,6 +17,7 @@ namespace Snitch
         {
             var typeRegistrar = new TypeRegistrar();
             typeRegistrar.Register(typeof(AnalyzeCommand.Settings), typeof(AnalyzeCommand.Settings));
+            typeRegistrar.Register(typeof(WhyCommand.Settings), typeof(WhyCommand.Settings));
 
             var app = new CommandApp<AnalyzeCommand>(typeRegistrar);
 
@@ -39,6 +40,11 @@ namespace Snitch
                 config.AddExample(new[] { "Solution.sln", "--tfm", "net462", "--strict" });
 
                 config.AddCommand<VersionCommand>("version");
+                config.AddCommand<WhyCommand>("why")
+                    .WithDescription("Shows every dependency path that leads to a package.")
+                    .WithExample(new[] { "why", "Newtonsoft.Json" })
+                    .WithExample(new[] { "why", "System.Text.Json", "Solution.sln" })
+                    .WithExample(new[] { "why", "System.Text.Json", "Project.csproj", "--tfm", "net8.0" });
             });
 
             return await app.RunAsync(args);
