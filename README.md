@@ -1,13 +1,55 @@
-# <img src="/src/icon.png" height="30px"> Snitch
+# <img src="/src/icon.png" height="40px"> Bonsai
 
-[![NuGet Status](https://img.shields.io/nuget/v/Snitch.svg)](https://www.nuget.org/packages/Snitch/)
+[![NuGet Status](https://img.shields.io/nuget/v/Bonsai.svg)](https://www.nuget.org/packages/Bonsai/)
 
-A tool that help you find transitive package references that can be removed.
+**Bonsai prunes your .NET dependency tree.**
+
+Like the miniature tree it's named after, Bonsai helps you keep your .NET
+project's package graph small and intentional. Point it at a `.csproj`, `.sln`,
+or `.slnx` and it tells you which `PackageReference` lines you're dragging
+around for no reason — packages already pulled in transitively by a project
+reference, duplicate version bumps, accidental downgrades, stray pre-release
+pins, and known-vulnerable packages flagged by [OSV.dev](https://osv.dev).
+
+> Bonsai is a fork of [Snitch](https://github.com/spectresystems/snitch) by
+> [Patrik Svensson](https://github.com/patriksvensson) and Spectre Systems AB.
+> All credit for the original design and implementation goes to the Snitch
+> authors — Bonsai exists to continue publishing the tool with ongoing
+> maintenance and a few opinionated additions aimed at dependency triage and
+> vulnerability response.
+
+## What it does
+
+- **Find removable transitive references.** Lists `PackageReference` entries
+  that are already supplied by a referenced project, so you can delete them
+  from the consumer's `.csproj`.
+- **Flag risky overrides.** Highlights packages where one project pins a
+  different version than another in the same graph — upgrades, downgrades, and
+  ranges that don't match.
+- **Catch stray pre-releases.** `--no-prerelease` fails the run if any
+  reference points at a non-stable version, which is handy for CI.
+- **Cross-reference against OSV.dev.** `--vulnerable` queries the
+  [OSV.dev](https://osv.dev) vulnerability database (aggregating GHSA, NVD,
+  and CVE data) and shows severity beside every referenced package, plus a
+  dedicated *Vulnerable packages* section.
+- **Classify internal vs external.** `--internal <PATTERN>` groups results
+  into packages you own (fix at source) versus packages you don't (wait or
+  override locally) — handy when triaging a CVE sweep.
+- **Trace transitive paths.** `bonsai why <package>` walks every project's
+  `project.assets.json` and shows every dependency path from a direct
+  reference down to the package across the whole solution.
+- **Speak modern .NET.** Works with classic `.sln` files, the new
+  [`.slnx`](https://learn.microsoft.com/en-us/visualstudio/ide/solutions-folders-and-projects#slnx-solution-file)
+  XML solution format, and
+  [Central Package Management](https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management)
+  (`Directory.Packages.props`).
+- **Strict mode for CI.** `--strict` returns a non-zero exit code when
+  anything actionable is found.
 
 ## Example
 
 ```
-> snitch --tfm net462
+> bonsai --tfm net462
 ```
 
 Results in:
@@ -16,7 +58,7 @@ Results in:
 <a id='snippet-Solution.Default.verified.txt'></a>
 ```txt
 Analyzing...
-Analyzing Snitch.Tests.Fixtures.sln
+Analyzing Bonsai.Tests.Fixtures.sln
 Analyzing Foo...
 Analyzing Bar...
 Analyzing Baz...
@@ -65,57 +107,62 @@ Analyzing Zap...
 │ └──────────────────┴──────────┴───────────────────────────────┘ │
 ╰─────────────────────────────────────────────────────────────────╯
 ```
-<sup><a href='/src/Snitch.Tests/Expectations/Solution.Default.verified.txt#L1-L49' title='Snippet source file'>snippet source</a> | <a href='#snippet-Solution.Default.verified.txt' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Bonsai.Tests/Expectations/Solution.Default.verified.txt#L1-L49' title='Snippet source file'>snippet source</a> | <a href='#snippet-Solution.Default.verified.txt' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
+
+`Packages that can be removed` are safe deletions — same package, same version,
+already pulled in by a referenced project. `Packages that might be removed`
+need a human: the version doesn't line up, so deleting the local reference
+would change what your project resolves to.
 
 ## Installation
 
 ```
-> dotnet tool install -g snitch
+> dotnet tool install -g bonsai
 ```
 
 ## Usage
 
-_Examine a specific project or solution using the first built 
+_Examine a specific project or solution using the first built
 target framework._
 
 ```
-> snitch MyProject.csproj
+> bonsai MyProject.csproj
 ```
 
 _Examine a specific project using a specific
 target framework moniker._
 
 ```
-> snitch MyProject.csproj --tfm net462
+> bonsai MyProject.csproj --tfm net462
 ```
 
 _Examine a specific project using a specific target framework moniker
-and return exit code 0 only if there was no transitive package collisions.
+and return exit code 0 only if there were no transitive package collisions.
 Useful for continuous integration._
 
 ```
-> snitch MyProject.csproj --tfm net462 --strict
+> bonsai MyProject.csproj --tfm net462 --strict
 ```
 
 _Examine a specific project using a specific target framework moniker
-and make sure that the packages Foo and Bar are excluded from the result._
+and exclude the packages Foo and Bar from the result._
 
 ```
-> snitch MyProject.csproj --tfm net462 --exclude Foo --exclude Bar
+> bonsai MyProject.csproj --tfm net462 --exclude Foo --exclude Bar
 ```
 
 _Examine a specific project using a specific target framework moniker
 and exclude the project OtherProject from analysis._
 
 ```
-> snitch MyProject.csproj --tfm net462 --skip OtherProject
+> bonsai MyProject.csproj --tfm net462 --skip OtherProject
 ```
 
 _Examine a specific project or solution to make sure there are no pre-release package references._
 
 ```
-> snitch MyProject.csproj --no-prerelease
+> bonsai MyProject.csproj --no-prerelease
 ```
 
 _Examine a specific project or solution and cross-reference every referenced
@@ -125,7 +172,7 @@ package, plus a dedicated "Vulnerable packages" section listing every advisory
 hit. Combine with `--strict` to fail CI when any vulnerable package is found._
 
 ```
-> snitch MyProject.csproj --vulnerable
+> bonsai MyProject.csproj --vulnerable
 ```
 
 _Group results by internal vs external packages so you can triage who-fixes-what
@@ -138,7 +185,7 @@ with a "." separator after the prefix (so `Acme` matches `Acme` and
 the full package name._
 
 ```
-> snitch MyProject.csproj --internal Acme --internal MyCompany.*
+> bonsai MyProject.csproj --internal Acme --internal MyCompany.*
 ```
 
 ## Reverse dependency lookup
@@ -149,15 +196,15 @@ specific package, across the whole solution at once. It replaces having to run
 package.
 
 ```
-> snitch why System.Text.Json
+> bonsai why System.Text.Json
 ```
 
 ```
-> snitch why System.Text.Json MyProject.csproj
+> bonsai why System.Text.Json MyProject.csproj
 ```
 
 ```
-> snitch why System.Text.Json MySolution.sln --tfm net8.0
+> bonsai why System.Text.Json MySolution.sln --tfm net8.0
 ```
 
 Paths are displayed as a tree per project, merging shared prefixes. Project
@@ -165,13 +212,24 @@ references in the chain are marked `(project)` so you can tell them apart from
 NuGet packages. Run `dotnet restore` first — the command reads each project's
 `project.assets.json`.
 
-## Building Snitch from source
+## Building Bonsai from source
 
 ```
 > dotnet tool restore
 > dotnet cake
 ```
 
-## Icon
+## Credits
 
-[Hollow](https://thenounproject.com/term/stitch/1571973/) designed by [Ben Davis](https://thenounproject.com/smashicons/) from [The Noun Project](https://thenounproject.com).
+Bonsai is a fork of [Snitch](https://github.com/spectresystems/snitch) by
+[Patrik Svensson](https://github.com/patriksvensson) and Spectre Systems AB.
+The original work is licensed under MIT — see [`LICENSE`](LICENSE) for the
+combined copyright notice.
+
+## Logo
+
+The Bonsai mark is a bonsai tree in a terracotta pot with a single
+cleanly-cut branch and pruning shears beside it — a literal nod to what
+the tool does to your dependency tree. Generated with
+[Nano Banana](https://deepmind.google/models/gemini/image/) (Gemini 2.5
+Flash Image).
