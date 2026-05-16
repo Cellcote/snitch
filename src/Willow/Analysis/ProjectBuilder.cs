@@ -1,0 +1,208 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Buildalyzer;
+using Buildalyzer.IO;
+using Spectre.Console;
+using Willow.Analysis.Utilities;
+
+namespace Willow.Analysis
+{
+    internal sealed class ProjectBuilder
+    {
+        private readonly IAnsiConsole _console;
+
+        public ProjectBuilder(IAnsiConsole console)
+        {
+            _console = console ?? throw new ArgumentNullException(nameof(console));
+        }
+
+        public ProjectBuildResult Build(
+            string path,
+            string? tfm,
+            string[]? skip,
+            IEnumerable<Project>? cache = null,
+            AnalyzerManager? manager = null)
+        {
+            manager ??= new AnalyzerManager();
+            var built = cache?.ToDictionary(x => x.File, x => x, StringComparer.OrdinalIgnoreCase)
+                ?? new Dictionary<string, Project>(StringComparer.OrdinalIgnoreCase);
+
+            var project = Build(manager, path, tfm, skip, built);
+
+            // Get all dependencies which are all built projects minus the project.
+            var dependencies = new HashSet<Project>(built.Values, new ProjectComparer());
+            dependencies.Remove(project);
+
+            return new ProjectBuildResult(project, dependencies);
+        }
+
+        private Project Build(
+            AnalyzerManager manager,
+            string path,
+            string? tfm,
+            string[]? skip,
+            Dictionary<string, Project> built,
+            int indentation = 0)
+        {
+            if (manager == null)
+            {
+                throw new ArgumentNullException(nameof(manager));
+            }
+
+            if (built == null)
+            {
+                throw new ArgumentNullException(nameof(built));
+            }
+
+            path = Path.GetFullPath(path);
+
+            // Already built this project?
+            if (built.TryGetValue(Path.GetFileName(path), out var project))
+            {
+                return project;
+            }
+
+            project = new Project(path);
+
+            var result = Build(manager, project, tfm, indentation);
+            if (result == null)
+            {
+                throw new InvalidOperationException($"Could not build {path}.");
+            }
+
+            // Get the asset path.
+            var assetPath = result.GetProjectAssetsFilePath();
+            if (!string.IsNullOrWhiteSpace(assetPath))
+            {
+                if (!File.Exists(assetPath))
+                {
+                    // Todo: Make sure this exists in future
+                    throw new InvalidOperationException($"{assetPath} not found. Please restore the project's dependencies before running Willow.");
+                }
+            }
+            else
+            {
+                var prefix = new string(' ', indentation * 2);
+                if (indentation > 0)
+                {
+                    prefix += "  ";
+                }
+
+                _console.MarkupLine($"{prefix}[yellow]WARN:[/] Old CSPROJ format can't be analyzed");
+            }
+
+            // Set project information.
+            project.TargetFramework = result.TargetFramework;
+            project.LockFilePath = assetPath;
+
+            // Detect Central Package Management (CPM).
+            var managePackageVersionsCentrally = result.GetProperty("ManagePackageVersionsCentrally");
+            project.IsCpmEnabled = string.Equals(managePackageVersionsCentrally, "true", StringComparison.OrdinalIgnoreCase);
+            if (project.IsCpmEnabled)
+            {
+                var directoryPackagesPropsPath = result.GetProperty("DirectoryPackagesPropsPath");
+                project.Cpm = CentralPackageManagementReader.Read(directoryPackagesPropsPath, Path.GetDirectoryName(path) ?? string.Empty);
+            }
+
+            // Add the project to the built list.
+            built.Add(Path.GetFileName(path), project);
+
+            // Get the package references.
+            // Order by package name so the resulting package list is deterministic;
+            // IReadOnlyDictionary's enumeration order is not contractually guaranteed.
+            foreach (var packageReference in result.PackageReferences.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!packageReference.Value.TryGetValue("Version", out var version))
+                {
+                    version = null;
+                }
+
+                // Under CPM, GlobalPackageReference items may surface with an empty
+                // Version metadata — fall back to the central version.
+                if (string.IsNullOrWhiteSpace(version) && project.IsCpmEnabled && project.Cpm != null)
+                {
+                    project.Cpm.CentralPackageVersions.TryGetValue(packageReference.Key, out version);
+                }
+
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    continue;
+                }
+
+                var privateAssets = packageReference.Value.GetValueOrDefault("PrivateAssets");
+
+                var package = new Package(packageReference.Key, version, privateAssets);
+                if (project.IsCpmEnabled)
+                {
+                    package.IsCentrallyManaged = true;
+                    if (project.Cpm?.IsGlobalPackageReference(packageReference.Key) == true)
+                    {
+                        package.IsGlobalPackageReference = true;
+                    }
+                }
+
+                project.Packages.Add(package);
+            }
+
+            // Analyze all project references.
+            foreach (var projectReference in result.ProjectReferences)
+            {
+                var projectReferencePath = PathUtility.GetPathRelativeToProject(project, projectReference);
+
+                if (skip != null)
+                {
+                    var projectName = Path.GetFileNameWithoutExtension(projectReferencePath);
+                    if (skip.Contains(projectName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                }
+
+                if (!projectReferencePath.EndsWith("csproj", StringComparison.OrdinalIgnoreCase) && !projectReferencePath.EndsWith("fsproj", StringComparison.OrdinalIgnoreCase))
+                {
+                    _console.MarkupLine(string.IsNullOrWhiteSpace(tfm)
+                        ? $"Skipping Non .NET Project [aqua]{project.Name}[/]"
+                        : $"Skipping Non .NET Project [aqua]{project.Name}[/] [grey] ({tfm})[/]");
+
+                    _console.WriteLine();
+
+                    continue;
+                }
+
+                var analyzedProjectReference = Build(manager, projectReferencePath, project.TargetFramework, skip, built, indentation + 1);
+                project.ProjectReferences.Add(analyzedProjectReference);
+            }
+
+            return project;
+        }
+
+        private IAnalyzerResult? Build(AnalyzerManager manager, Project project, string? tfm, int indentation)
+        {
+            var prefix = new string(' ', indentation * 2);
+            if (indentation > 0)
+            {
+                prefix += "[grey]*[/] ";
+            }
+
+            var status = string.IsNullOrWhiteSpace(tfm)
+                ? $"{prefix}Analyzing [aqua]{project.Name}[/]..."
+                : $"{prefix}Analyzing [aqua]{project.Name}[/] [grey]({tfm})[/]...";
+
+            _console.MarkupLine(status);
+
+            var projectAnalyzer = manager.GetProject(IOPath.Parse(project.Path))
+                ?? throw new InvalidOperationException($"Could not load project '{project.Path}'.");
+            var results = (IEnumerable<IAnalyzerResult>)projectAnalyzer.Build();
+
+            if (!string.IsNullOrWhiteSpace(tfm))
+            {
+                var closest = results.GetNearestFrameworkMoniker(tfm);
+                results = results.Where(p => p.TargetFramework.Equals(closest, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return results.FirstOrDefault();
+        }
+    }
+}

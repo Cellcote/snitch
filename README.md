@@ -1,20 +1,20 @@
-# <img src="/src/icon.png" height="40px"> Bonsai
+# <img src="/src/icon.png" height="40px"> Willow
 
-[![NuGet Status](https://img.shields.io/nuget/v/Bonsai.svg)](https://www.nuget.org/packages/Bonsai/)
+[![NuGet Status](https://img.shields.io/nuget/v/Willow.svg)](https://www.nuget.org/packages/Willow/)
 
-**Bonsai prunes your .NET dependency tree.**
+**Willow prunes your .NET dependency tree.**
 
-Like the miniature tree it's named after, Bonsai helps you keep your .NET
-project's package graph small and intentional. Point it at a `.csproj`, `.sln`,
-or `.slnx` and it tells you which `PackageReference` lines you're dragging
-around for no reason — packages already pulled in transitively by a project
-reference, duplicate version bumps, accidental downgrades, stray pre-release
-pins, and known-vulnerable packages flagged by [OSV.dev](https://osv.dev).
+A willow tree is shaped by patient pruning — Willow does the same for your
+.NET project's package graph. Point it at a `.csproj`, `.sln`, or `.slnx` and
+it tells you which `PackageReference` lines you're dragging around for no
+reason — packages already pulled in transitively by a project reference,
+duplicate version bumps, accidental downgrades, stray pre-release pins, and
+known-vulnerable packages flagged by [OSV.dev](https://osv.dev).
 
-> Bonsai is a fork of [Snitch](https://github.com/spectresystems/snitch) by
+> Willow is a fork of [Snitch](https://github.com/spectresystems/snitch) by
 > [Patrik Svensson](https://github.com/patriksvensson) and Spectre Systems AB.
 > All credit for the original design and implementation goes to the Snitch
-> authors — Bonsai exists to continue publishing the tool with ongoing
+> authors — Willow exists to continue publishing the tool with ongoing
 > maintenance and a few opinionated additions aimed at dependency triage and
 > vulnerability response.
 
@@ -35,7 +35,7 @@ pins, and known-vulnerable packages flagged by [OSV.dev](https://osv.dev).
 - **Classify internal vs external.** `--internal <PATTERN>` groups results
   into packages you own (fix at source) versus packages you don't (wait or
   override locally) — handy when triaging a CVE sweep.
-- **Trace transitive paths.** `bonsai why <package>` walks every project's
+- **Trace transitive paths.** `willow why <package>` walks every project's
   `project.assets.json` and shows every dependency path from a direct
   reference down to the package across the whole solution.
 - **Speak modern .NET.** Works with classic `.sln` files, the new
@@ -49,7 +49,7 @@ pins, and known-vulnerable packages flagged by [OSV.dev](https://osv.dev).
 ## Example
 
 ```
-> bonsai --tfm net462
+> willow --tfm net462
 ```
 
 Results in:
@@ -58,7 +58,7 @@ Results in:
 <a id='snippet-Solution.Default.verified.txt'></a>
 ```txt
 Analyzing...
-Analyzing Bonsai.Tests.Fixtures.sln
+Analyzing Willow.Tests.Fixtures.sln
 Analyzing Foo...
 Analyzing Bar...
 Analyzing Baz...
@@ -107,7 +107,7 @@ Analyzing Zap...
 │ └──────────────────┴──────────┴───────────────────────────────┘ │
 ╰─────────────────────────────────────────────────────────────────╯
 ```
-<sup><a href='/src/Bonsai.Tests/Expectations/Solution.Default.verified.txt#L1-L49' title='Snippet source file'>snippet source</a> | <a href='#snippet-Solution.Default.verified.txt' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Willow.Tests/Expectations/Solution.Default.verified.txt#L1-L49' title='Snippet source file'>snippet source</a> | <a href='#snippet-Solution.Default.verified.txt' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 `Packages that can be removed` are safe deletions — same package, same version,
@@ -118,7 +118,7 @@ would change what your project resolves to.
 ## Installation
 
 ```
-> dotnet tool install -g bonsai
+> dotnet tool install -g willow
 ```
 
 ## Usage
@@ -127,14 +127,14 @@ _Examine a specific project or solution using the first built
 target framework._
 
 ```
-> bonsai MyProject.csproj
+> willow MyProject.csproj
 ```
 
 _Examine a specific project using a specific
 target framework moniker._
 
 ```
-> bonsai MyProject.csproj --tfm net462
+> willow MyProject.csproj --tfm net462
 ```
 
 _Examine a specific project using a specific target framework moniker
@@ -142,27 +142,27 @@ and return exit code 0 only if there were no transitive package collisions.
 Useful for continuous integration._
 
 ```
-> bonsai MyProject.csproj --tfm net462 --strict
+> willow MyProject.csproj --tfm net462 --strict
 ```
 
 _Examine a specific project using a specific target framework moniker
 and exclude the packages Foo and Bar from the result._
 
 ```
-> bonsai MyProject.csproj --tfm net462 --exclude Foo --exclude Bar
+> willow MyProject.csproj --tfm net462 --exclude Foo --exclude Bar
 ```
 
 _Examine a specific project using a specific target framework moniker
 and exclude the project OtherProject from analysis._
 
 ```
-> bonsai MyProject.csproj --tfm net462 --skip OtherProject
+> willow MyProject.csproj --tfm net462 --skip OtherProject
 ```
 
 _Examine a specific project or solution to make sure there are no pre-release package references._
 
 ```
-> bonsai MyProject.csproj --no-prerelease
+> willow MyProject.csproj --no-prerelease
 ```
 
 _Examine a specific project or solution and cross-reference every referenced
@@ -172,7 +172,7 @@ package, plus a dedicated "Vulnerable packages" section listing every advisory
 hit. Combine with `--strict` to fail CI when any vulnerable package is found._
 
 ```
-> bonsai MyProject.csproj --vulnerable
+> willow MyProject.csproj --vulnerable
 ```
 
 _Group results by internal vs external packages so you can triage who-fixes-what
@@ -185,7 +185,7 @@ with a "." separator after the prefix (so `Acme` matches `Acme` and
 the full package name._
 
 ```
-> bonsai MyProject.csproj --internal Acme --internal MyCompany.*
+> willow MyProject.csproj --internal Acme --internal MyCompany.*
 ```
 
 ## Reverse dependency lookup
@@ -196,15 +196,15 @@ specific package, across the whole solution at once. It replaces having to run
 package.
 
 ```
-> bonsai why System.Text.Json
+> willow why System.Text.Json
 ```
 
 ```
-> bonsai why System.Text.Json MyProject.csproj
+> willow why System.Text.Json MyProject.csproj
 ```
 
 ```
-> bonsai why System.Text.Json MySolution.sln --tfm net8.0
+> willow why System.Text.Json MySolution.sln --tfm net8.0
 ```
 
 Paths are displayed as a tree per project, merging shared prefixes. Project
@@ -212,7 +212,7 @@ references in the chain are marked `(project)` so you can tell them apart from
 NuGet packages. Run `dotnet restore` first — the command reads each project's
 `project.assets.json`.
 
-## Building Bonsai from source
+## Building Willow from source
 
 ```
 > dotnet tool restore
@@ -221,15 +221,15 @@ NuGet packages. Run `dotnet restore` first — the command reads each project's
 
 ## Credits
 
-Bonsai is a fork of [Snitch](https://github.com/spectresystems/snitch) by
+Willow is a fork of [Snitch](https://github.com/spectresystems/snitch) by
 [Patrik Svensson](https://github.com/patriksvensson) and Spectre Systems AB.
 The original work is licensed under MIT — see [`LICENSE`](LICENSE) for the
 combined copyright notice.
 
 ## Logo
 
-The Bonsai mark is a bonsai tree in a terracotta pot with a single
-cleanly-cut branch and pruning shears beside it — a literal nod to what
-the tool does to your dependency tree. Generated with
-[Nano Banana](https://deepmind.google/models/gemini/image/) (Gemini 2.5
-Flash Image).
+The Willow mark is a willow tree with its characteristic drooping branches,
+beside a small pair of pruning shears and a cleanly-cut branch on the
+ground — a literal nod to what the tool does to your dependency tree.
+Generated with [Nano Banana](https://deepmind.google/models/gemini/image/)
+(Gemini 2.5 Flash Image).

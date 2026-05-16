@@ -14,7 +14,7 @@ Task("Build")
     .IsDependentOn("Clean")
     .Does(() =>
 {
-    DotNetBuild("./src/Bonsai.sln", new DotNetBuildSettings
+    DotNetBuild("./src/Willow.sln", new DotNetBuildSettings
     {
         Configuration = "Release",
         MSBuildSettings = new DotNetMSBuildSettings()
@@ -29,7 +29,7 @@ Task("Run-Tests")
     .IsDependentOn("Build")
     .Does(() =>
 {
-    DotNetTest("./src/Bonsai.Tests/Bonsai.Tests.csproj", new DotNetTestSettings
+    DotNetTest("./src/Willow.Tests/Willow.Tests.csproj", new DotNetTestSettings
     {
         Configuration = "Release"
     });
@@ -39,7 +39,7 @@ Task("Pack")
     .IsDependentOn("Run-Tests")
     .Does(() =>
 {
-    DotNetPack("./src/Bonsai.sln", new DotNetPackSettings
+    DotNetPack("./src/Willow.sln", new DotNetPackSettings
     {
         Configuration = "Release",
         NoRestore = true,
