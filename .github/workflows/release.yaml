@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  release:
+    name: Publish to NuGet
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build, test, and pack
+        shell: bash
+        run: |
+          dotnet tool restore
+          dotnet cake --packageversion="${{ steps.version.outputs.version }}"
+
+      - name: Push to NuGet
+        shell: bash
+        run: |
+          dotnet nuget push "./.artifacts/Willow.${{ steps.version.outputs.version }}.nupkg" \
+            --api-key "${{ secrets.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+      - name: Attach .nupkg to GitHub release
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./.artifacts/Willow.${{ steps.version.outputs.version }}.nupkg
+          generate_release_notes: true
